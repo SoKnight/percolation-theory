@@ -1,5 +1,5 @@
-.gradle/
 .idea/
+.gradle/
 .kotlin/
 build/
 out/
@@ -7,5 +7,4 @@ out/
 *.jar
 .DS_Store
 
-!gradle/wrapper/gradle-wrapper.jar
-!gradle/wrapper/gradle-wrapper.properties
+!gradle/wrapper/*
