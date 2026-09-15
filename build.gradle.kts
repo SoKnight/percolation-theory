@@ -10,6 +10,7 @@ application {
     mainClass = "MainKt"
 
     applicationDefaultJvmArgs = listOf(
+        "--enable-native-access=ALL-UNNAMED",
         "-Dstdout.encoding=UTF-8",
         "-Dstderr.encoding=UTF-8",
     )
@@ -21,6 +22,10 @@ kotlin {
 
 repositories {
     mavenCentral()
+}
+
+dependencies {
+    implementation(libs.clikt)
 }
 
 tasks.named<JavaExec>("run") {
