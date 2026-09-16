@@ -19,7 +19,7 @@ import kotlin.math.roundToInt
 class Generator(private val random: RandomGenerator = SplittableRandom()) {
 
     /**
-     * Создаёт решётку [size] x [size] и занимает в ней `round(p * L^2)` случайных свободных узлов.
+     * Создаёт решётку [size] x [size] и занимает в ней `round(p * L²)` случайных свободных узлов.
      */
     fun generate(size: Int, p: Double): Lattice {
         require(p in 0.0..1.0) { "Концентрация должна быть в [0, 1]: $p" }
