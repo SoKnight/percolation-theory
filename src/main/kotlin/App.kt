@@ -1,37 +1,78 @@
 
 import cli.AppCommand
-import data.Generator
-import util.format
-import util.writeAsPNG
+import stats.Experiment
+import stats.Series
+import util.*
 import java.util.*
+import kotlin.io.path.Path
+import kotlin.io.path.createParentDirectories
+import kotlin.io.path.writeLines
 
-private const val MAX_PRINT_SIZE = 50
+private val CONCENTRATIONS = (1..9).map { it / 10.0 }
+
+private val HEADERS = listOf("p", "k", "m", "df", "x²крит", "x²(1)", "<x²>", "доля", "x²сумм", "x²(1)", "<x²>", "доля", "x²сумм")
+private val WIDTHS = listOf(4, 3, 4, 4, 8, 8, 8, 5, 8, 8, 8, 5, 8)
+
+private val CSV_HEADERS = listOf(
+    "p", "k", "m", "df", "critical",
+    "chi2_first", "chi2_mean", "passed", "chi2_total",
+    "chi2_first_corrected", "chi2_mean_corrected", "passed_corrected", "chi2_total_corrected",
+    "mean_concentration",
+)
 
 /**
- * Проводит заданное число испытаний и печатает статистику концентрации по ним.
+ * Проводит серии испытаний для всех концентраций, печатает таблицу, сохраняет CSV и, если нужно, картинки решёток и графики.
  */
 fun AppCommand.main() {
-    val generator = seed?.let { Generator(SplittableRandom(it)) } ?: Generator()
-    val stats = DoubleSummaryStatistics()
+    // решётки нужны только для картинок, а при больших L каждая занимает сотни МБ памяти
+    val experiment = Experiment(size, trials, parallel, seed, keepSample = lattices)
 
-    repeat(trials) { trial ->
-        val lattice = generator.generate(size, p)
-        stats.accept(lattice.concentration)
+    val start = System.nanoTime()
+    val results = CONCENTRATIONS.map(experiment::run)
+    val elapsed = (System.nanoTime() - start) / 1e9
 
-        if (size <= MAX_PRINT_SIZE && !quiet) {
-            echo("Испытание ${trial + 1}: занято ${lattice.occupied} из ${size * size}, концентрация ${lattice.concentration.format()}")
-            echo(lattice.render())
-            echo()
+    val mode = if (parallel) "параллельно" else "в одном потоке"
+    echo("Решётка $size x $size, испытаний на концентрацию: $trials, alpha = ${results[0].uniformity.alpha.format()}, $mode")
+    echo()
+    echo(" ".repeat(WIDTHS.take(5).sum() + 5) + "без поправки".padEnd(WIDTHS.slice(5..8).sum() + 4) + "с поправкой x²/(1-p)")
+    echo(HEADERS.zip(WIDTHS) { header, width -> header.padStart(width) }.joinToString(" "))
+    for (series in results)
+        echo(series.values().zip(WIDTHS) { value, width -> value.cell().padStart(width) }.joinToString(" "))
+
+    val csv = Path("out", "uniformity_L$size.csv").createParentDirectories()
+    csv.writeLines(listOf(CSV_HEADERS.joinToString(",")) + results.map { series ->
+        (series.values() + series.concentration).joinToString(",") { if (it is Double) it.format() else it.toString() }
+    })
+    echo()
+    echo("Таблица сохранена в: $csv")
+
+    if (lattices) {
+        for (series in results) {
+            val lattice = series.sample!!
+            lattice.writeAsPNG(lattice.defaultPathPNG(series.p))
+            lattice.writeWithGridAsPNG(
+                grid = series.uniformity.grid,
+                counts = series.uniformity.count(lattice),
+                path = Path("out", "grid_L${size}_p${series.p.format()}.png"),
+            )
         }
 
-        if (png && trial == 0) {
-            val path = lattice.writeAsPNG(p = p)
-            echo("Решётка сохранена в: $path")
-        }
+        echo("Решётки первых испытаний сохранены в: out/lattice_L${size}_p*.png, out/grid_L${size}_p*.png")
     }
 
-    echo("Решётка ${size}×${size}, заданная концентрация ${p.format()}, испытаний: $trials")
-    echo("Средняя концентрация: ${stats.average.format()}")
-    echo("Минимальная: ${stats.min.format()}")
-    echo("Максимальная: ${stats.max.format()}")
+    if (plots) {
+        for (path in writePlots(results, size))
+            echo("График сохранён в: $path")
+    }
+
+    echo("Время расчёта: ${"%.2f".format(Locale.ROOT, elapsed)} с")
 }
+
+private fun Series.values(): List<Number> = listOf(
+    p, uniformity.grid.k, uniformity.grid.m, uniformity.df, uniformity.critical,
+    raw.first, raw.mean, raw.passed, raw.total,
+    corrected.first, corrected.mean, corrected.passed, corrected.total,
+)
+
+private fun Number.cell(): String =
+    if (this is Double) "%.2f".format(Locale.ROOT, this) else toString()

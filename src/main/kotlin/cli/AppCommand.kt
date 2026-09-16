@@ -2,52 +2,55 @@ package cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.parameters.options.flag
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.prompt
-import com.github.ajalt.clikt.parameters.types.double
+import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.types.boolean
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.restrictTo
 import main
 
 /**
- * Размер `-L`, концентрацию `-p` и число испытаний `-n` можно передать при запуске,
- * а если какой-то из них не указан, команда спросит его у пользователя.
- * Например, `-L 6 -p 0.5 -n 5 --seed=1` или просто запуск без аргументов.
+ * Команда второго задания: оценивает равномерность заполнения решётки критерием Пирсона
+ * сериями испытаний для концентраций от `0.1` до `0.9`.
  *
- * Выводит матрицу каждого испытания (только при `L <= 50` и без `--quiet`),
- * затем среднюю, минимальную и максимальную концентрацию по всем испытаниям.
- * С `--png` первая решётка сохраняется картинкой в `out/`.
+ * Размер `-L` и число испытаний `-n` можно передать при запуске, а если какой-то из них не указан,
+ * команда спросит его у пользователя. Например, `--L=1000 --trials=100 --seed=42 --no-lattices --plots`.
+ *
+ * Печатает таблицу по всем концентрациям и сохраняет её в `out/uniformity_L{L}.csv`.
+ * С `--lattices` в `out/` сохраняются ещё картинки решёток, с `--plots` графики.
+ * Если не указан ни флаг, ни его вариант с `--no-`, команда тоже спросит.
  */
 class AppCommand : CliktCommand() {
 
-    val size by option("-L", "--size", help = "линейный размер решётки")
+    // при меньших L и p = 0.1 выходит n < 96, то есть один интервал и df = 0
+    val size by option("-L", "--L", "--size", help = "линейный размер решётки, не меньше 31")
         .int()
-        .restrictTo(min = 1)
+        .restrictTo(min = 31)
         .prompt("Размер решётки L")
 
-    val p by option("-p", "--concentration", help = "заданная концентрация, от 0 до 1")
-        .double()
-        .restrictTo(0.0..1.0)
-        .prompt("Концентрация p")
-
-    val trials by option("-n", "--trials", help = "число испытаний")
+    val trials by option("-n", "--trials", help = "число испытаний на каждую концентрацию")
         .int()
         .restrictTo(min = 1)
-        .prompt("Число испытаний", default = 1)
+        .prompt("Число испытаний", default = 100)
 
     val seed by option("--seed", help = "seed генератора для воспроизводимых результатов")
         .long()
 
-    val png by option("--png", help = "сохранить первую решётку картинкой в out/")
-        .flag()
+    val parallel by option("--parallel", help = "проводить испытания параллельно")
+        .boolean()
+        .optionalValue(true)
+        .default(true)
 
-    val quiet by option("--quiet", help = "не печатать матрицы")
-        .flag()
+    val lattices by option("--lattices", help = "сохранить картинки решёток в out/")
+        .flag("--no-lattices")
+        .prompt("Сохранить картинки решёток?", default = false)
+
+    val plots by option("--plots", help = "сохранить графики в out/")
+        .flag("--no-plots")
+        .prompt("Сохранить графики?", default = false)
 
     override fun help(context: Context): String =
-        "Случайное равномерное заполнение простой квадратной решётки L x L"
+        "Оценка равномерности заполнения решётки L x L критерием Пирсона"
 
     override fun run() = main()
 
