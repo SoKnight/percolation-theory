@@ -13,6 +13,7 @@ application {
         "--enable-native-access=ALL-UNNAMED",
         "-Dstdout.encoding=UTF-8",
         "-Dstderr.encoding=UTF-8",
+        "-Djava.awt.headless=true",
     )
 }
 
@@ -26,6 +27,9 @@ repositories {
 
 dependencies {
     implementation(libs.clikt)
+    implementation(libs.commons.math)
+    implementation(libs.lets.plot.kotlin)
+    runtimeOnly(libs.slf4j.nop)
 }
 
 tasks.named<JavaExec>("run") {
